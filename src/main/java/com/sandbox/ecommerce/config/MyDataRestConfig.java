@@ -10,6 +10,7 @@ import com.sandbox.ecommerce.entity.ProductCategory;
 import com.sandbox.ecommerce.entity.Country;
 import com.sandbox.ecommerce.entity.State;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.rest.core.config.RepositoryRestConfiguration;
 import org.springframework.data.rest.webmvc.config.RepositoryRestConfigurer;
@@ -19,6 +20,9 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 @Configuration
 public class MyDataRestConfig implements RepositoryRestConfigurer {
 
+    @Value("${allowed.origins}")
+    private String[] theAllowedOrigins;
+    
     private EntityManager entityManager;
 
     @Autowired
@@ -29,27 +33,29 @@ public class MyDataRestConfig implements RepositoryRestConfigurer {
     @Override
     public void configureRepositoryRestConfiguration(RepositoryRestConfiguration config,
             CorsRegistry cors) {
-        HttpMethod[] theUnsupportedAction = {HttpMethod.PUT, HttpMethod.DELETE, HttpMethod.POST};
+        HttpMethod[] theUnsupportedActions = {HttpMethod.PUT, HttpMethod.DELETE, HttpMethod.POST, HttpMethod.PATCH};
 
         // disable HTTP method for Product and ProductCategory: PUT, POST, DELETE
-        disableHttpMethods(Product.class, config, theUnsupportedAction);
-        disableHttpMethods(ProductCategory.class, config, theUnsupportedAction);
-        disableHttpMethods(Country.class, config, theUnsupportedAction);
-        disableHttpMethods(State.class, config, theUnsupportedAction);
+        disableHttpMethods(Product.class, config, theUnsupportedActions);
+        disableHttpMethods(ProductCategory.class, config, theUnsupportedActions);
+        disableHttpMethods(Country.class, config, theUnsupportedActions);
+        disableHttpMethods(State.class, config, theUnsupportedActions);
 
         // call an internal helper method
         exposeIds(config);
 
-        RepositoryRestConfigurer.super.configureRepositoryRestConfiguration(config, cors);
+        // RepositoryRestConfigurer.super.configureRepositoryRestConfiguration(config, cors);
+        // configure cors mapping
+        cors.addMapping(config.getBasePath() + "/**").allowedOrigins(theAllowedOrigins);
     }
 
-	private void disableHttpMethods(Class theClass, RepositoryRestConfiguration config, HttpMethod[] theUnsupportedAction) {
+	private void disableHttpMethods(Class theClass, RepositoryRestConfiguration config, HttpMethod[] theUnsupportedActions) {
 		config.getExposureConfiguration()
         		.forDomainType(theClass)
                 .withItemExposure(
-                        (metdata, httpMethods) -> httpMethods.disable(theUnsupportedAction))
+                        (metdata, httpMethods) -> httpMethods.disable(theUnsupportedActions))
                 .withCollectionExposure(
-                        (metdata, httpMethods) -> httpMethods.disable(theUnsupportedAction));
+                        (metdata, httpMethods) -> httpMethods.disable(theUnsupportedActions));
 	}
 
     private void exposeIds(RepositoryRestConfiguration config) {
@@ -57,19 +63,18 @@ public class MyDataRestConfig implements RepositoryRestConfigurer {
         //
 
         // - get a list of all entity classes from the entity manager
-        Set<EntityType<?>> entites = entityManager.getMetamodel().getEntities();
+        Set<EntityType<?>> entities = entityManager.getMetamodel().getEntities();
 
         // - create an array of the entity types
         List<Class> entityClasses = new ArrayList<>();
 
         // - get the entity types for the entities
-        for (EntityType tempEntityType : entites) {
+        for (EntityType tempEntityType : entities) {
             entityClasses.add(tempEntityType.getJavaType());
         }
 
-        // - expose the entity ids for the array of entity/doman type
+        // - expose the entity ids for the array of entity/domain types
         Class[] domainTypes = entityClasses.toArray(new Class[0]);
         config.exposeIdsFor(domainTypes);
     }
-
 }
